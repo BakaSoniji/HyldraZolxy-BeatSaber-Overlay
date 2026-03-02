@@ -1,5 +1,13 @@
 <div id="top"></div>
 
+> **Fork Notice:** This fork adds **Docker support** so you can easily run the overlay locally for OBS.
+>
+> **Quick start:**
+> ```bash
+> docker compose up -d
+> ```
+> Then open `http://localhost:8080` in your browser or add it as a Browser Source in OBS.
+
 # BeatSaber-Overlay
 <hr />
 
