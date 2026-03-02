@@ -1,0 +1,104 @@
+name: Terraform
+
+on:
+  pull_request:
+    paths:
+      - 'terraform/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          tofu init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY }}" \
+            -backend-config="region=${{ vars.TF_STATE_REGION }}"
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform
+        run: |
+          tofu plan -no-color \
+            -var="domain_name=${{ vars.TF_VAR_DOMAIN_NAME }}" \
+            -var="route53_zone_name=${{ vars.TF_VAR_ROUTE53_ZONE_NAME }}" \
+            -var="s3_bucket_name=${{ vars.TF_VAR_S3_BUCKET_NAME }}" \
+            2>&1 | tee plan.txt
+        continue-on-error: true
+
+      - name: Post plan to PR
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/plan.txt', 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(-60000) : plan;
+            const body = `#### Terraform Plan\n\`\`\`\n${truncated}\n\`\`\`\n*Pushed by: @${{ github.actor }}*`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          tofu init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY }}" \
+            -backend-config="region=${{ vars.TF_STATE_REGION }}"
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          tofu apply -auto-approve \
+            -var="domain_name=${{ vars.TF_VAR_DOMAIN_NAME }}" \
+            -var="route53_zone_name=${{ vars.TF_VAR_ROUTE53_ZONE_NAME }}" \
+            -var="s3_bucket_name=${{ vars.TF_VAR_S3_BUCKET_NAME }}"

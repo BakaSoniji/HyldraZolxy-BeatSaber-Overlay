@@ -1,0 +1,98 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+      - 'README.md'
+      - '.backend.hcl.example'
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate CalVer tag
+        id: version
+        run: |
+          YEAR=$(date -u +%Y)
+          MONTH=$(date -u +%-m)
+          PREFIX="${YEAR}.${MONTH}"
+          PATCH=0
+          for tag in $(git tag -l "${PREFIX}.*" | sort -t. -k3 -n); do
+            NUM=${tag##*.}
+            if [ "$NUM" -ge "$PATCH" ]; then
+              PATCH=$((NUM + 1))
+            fi
+          done
+          VERSION="${PREFIX}.${PATCH}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Generated version: ${VERSION}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Replace domain
+        run: sed -i "s/overlay\.hyldrazolxy\.fr/${{ vars.SITE_DOMAIN }}/g" index.html js/*.js
+
+      - name: Replace version
+        run: sed -i "s|Overlay v2\.1\.1a|Overlay v${{ steps.version.outputs.version }}|g" index.html
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Sync to S3
+        env:
+          S3_BUCKET: ${{ vars.TF_VAR_S3_BUCKET_NAME }}
+        run: |
+          aws s3 sync ./js/ s3://$S3_BUCKET/js/ --delete --exclude "*.ts" --cache-control "max-age=86400"
+          aws s3 sync ./skins/ s3://$S3_BUCKET/skins/ --delete --cache-control "max-age=86400"
+          aws s3 sync ./pictures/ s3://$S3_BUCKET/pictures/ --delete --cache-control "max-age=86400"
+          aws s3 sync ./fonts/ s3://$S3_BUCKET/fonts/ --delete --cache-control "max-age=31536000, public, no-transform"
+          aws s3 cp ./index.html s3://$S3_BUCKET/index.html --cache-control "max-age=86400"
+          aws s3 cp ./style.global.css s3://$S3_BUCKET/style.global.css --cache-control "max-age=86400"
+          aws s3 cp ./ionicons.min.css s3://$S3_BUCKET/ionicons.min.css --cache-control "max-age=86400"
+
+      - name: Invalidate CloudFront cache
+        if: vars.CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Create release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: version,
+              name: `v${version}`,
+              target_commitish: context.sha,
+              generate_release_notes: true
+            });
