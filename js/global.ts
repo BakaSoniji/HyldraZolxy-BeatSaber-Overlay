@@ -10,7 +10,7 @@ export namespace Globals {
     }
 
     export const URI_NAV_SEARCH = window.location.search;
-    export const SCORESABER_API_PROXY_URL = "./php/scoreSaberProxy.php";
+    export const SCORESABER_API_PROXY_URL = "/api/scoresaber";
     export const BEATSAVER_API_URL = "https://api.beatsaver.com";
     export const MS_TIMER = 100;
 

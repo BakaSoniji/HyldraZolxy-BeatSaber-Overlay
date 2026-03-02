@@ -1,4 +1,8 @@
 /.idea/
 /node_modules/
 /js/*.js
-tsconfig.json
+tsconfig.tsbuildinfo
+.backend.hcl
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/.terraform.lock.hcl
