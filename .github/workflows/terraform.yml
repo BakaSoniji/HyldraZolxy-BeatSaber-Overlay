@@ -70,8 +70,48 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-  apply:
+  apply-plan:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          tofu init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY }}" \
+            -backend-config="region=${{ vars.TF_STATE_REGION }}"
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: |
+          tofu plan -no-color \
+            -var="domain_name=${{ vars.TF_VAR_DOMAIN_NAME }}" \
+            -var="route53_zone_name=${{ vars.TF_VAR_ROUTE53_ZONE_NAME }}" \
+            -var="s3_bucket_name=${{ vars.TF_VAR_S3_BUCKET_NAME }}" \
+            -out=tfplan
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: terraform/tfplan
+          retention-days: 1
+
+  apply:
+    needs: apply-plan
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -95,10 +135,12 @@ jobs:
             -backend-config="key=${{ vars.TF_STATE_KEY }}" \
             -backend-config="region=${{ vars.TF_STATE_REGION }}"
 
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: terraform
+
       - name: Terraform Apply
         working-directory: terraform
-        run: |
-          tofu apply -auto-approve \
-            -var="domain_name=${{ vars.TF_VAR_DOMAIN_NAME }}" \
-            -var="route53_zone_name=${{ vars.TF_VAR_ROUTE53_ZONE_NAME }}" \
-            -var="s3_bucket_name=${{ vars.TF_VAR_S3_BUCKET_NAME }}"
+        run: tofu apply tfplan
