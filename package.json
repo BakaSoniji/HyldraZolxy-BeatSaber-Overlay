@@ -4,7 +4,7 @@
     "description": "Beat Saber Overlay for BSPlus, HTTPStatus, HTTPSiraStatus and DataPuller",
     "main": "init.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "tsc --build && vite",
         "build": "tsc --build"
     },
     "author": "Hyldra Zolxy",
@@ -12,6 +12,7 @@
     "type": "module",
     "devDependencies": {
         "@types/jquery": "^3.5.14",
-        "typescript": "^5.0.0"
+        "typescript": "^5.0.0",
+        "vite": "^7.3.1"
     }
 }

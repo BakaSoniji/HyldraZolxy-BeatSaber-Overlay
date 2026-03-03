@@ -1,12 +1,15 @@
 <div id="top"></div>
 
-> **Fork Notice:** This fork adds **Docker support** so you can easily run the overlay locally for OBS.
+> **Fork Notice:** This fork replaces the PHP backend with a static site hosted on **S3 + CloudFront**.
+> The ScoreSaber API proxy is handled by CloudFront Functions (path rewriting + CORS).
+> Infrastructure is managed with Terraform and deployed via GitHub Actions.
 >
-> **Quick start:**
+> **Local development:**
 > ```bash
-> docker compose up -d
+> npm install
+> npm run dev
 > ```
-> Then open `http://localhost:8080` in your browser or add it as a Browser Source in OBS.
+> Then open `http://localhost:5173` in your browser or add it as a Browser Source in OBS.
 
 # BeatSaber-Overlay
 <hr />
@@ -43,6 +46,9 @@
       </li>
       <li>
          <a href="#options">Options</a>
+      </li>
+      <li>
+         <a href="#deployment">Deployment</a>
       </li>
       <li>
          <a href="#contact">Contact</a>
@@ -151,6 +157,50 @@ This is to change the position of the song card<br />
 
 `Scale`<br />
 This is to change the scale of the song card<br />
+
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+## Deployment
+
+This fork deploys to AWS using Terraform (S3 + CloudFront) and GitHub Actions (CI/CD).
+
+### Prerequisites
+
+- An AWS account with a Route53 hosted zone
+- An IAM role with OIDC trust for your GitHub repo (for GitHub Actions to assume)
+- The IAM role needs permissions for: S3, CloudFront, ACM, Route53, and the Terraform state bucket
+
+### GitHub Actions Configuration
+
+**Secrets** (sensitive):
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ROLE_ARN` | ARN of the IAM role for GitHub Actions to assume via OIDC |
+
+**Variables** (non-sensitive):
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AWS_REGION` | AWS region for the S3 bucket and CloudFront | `us-west-2` |
+| `SITE_DOMAIN` | Domain name used for `sed` replacement in deployed files | `hyldrazolxy-overlay.bakas.io` |
+| `TF_STATE_BUCKET` | S3 bucket for Terraform state | `my-tfstate-bucket` |
+| `TF_STATE_KEY` | Key path for the state file | `hyldrazolxy-overlay/terraform.tfstate` |
+| `TF_STATE_REGION` | Region of the Terraform state bucket | `us-west-2` |
+| `TF_VAR_DOMAIN_NAME` | Domain name for the overlay site | `hyldrazolxy-overlay.bakas.io` |
+| `TF_VAR_ROUTE53_ZONE_NAME` | Route53 hosted zone name | `bakas.io` |
+| `TF_VAR_S3_BUCKET_NAME` | S3 bucket name for site content | `my-overlay-bucket` |
+| `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution ID (set after first `terraform apply`) | `E1234567890` |
+
+### Environments
+
+Create a `production` environment with required reviewers. The Terraform apply step waits for approval before applying changes.
+
+### First Deploy
+
+1. Push to `main` — the Terraform workflow creates infrastructure (requires `production` approval)
+2. Set `CLOUDFRONT_DISTRIBUTION_ID` from the Terraform output
+3. Re-run the Deploy workflow to sync files to S3
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

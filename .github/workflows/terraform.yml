@@ -17,7 +17,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  plan:
+  speculative-plan:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -71,7 +71,7 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-  apply-plan:
+  plan:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -112,7 +112,7 @@ jobs:
           retention-days: 1
 
   apply:
-    needs: apply-plan
+    needs: plan
     runs-on: ubuntu-latest
     environment: production
     steps:
