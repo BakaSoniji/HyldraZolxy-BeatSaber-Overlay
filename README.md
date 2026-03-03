@@ -6,6 +6,14 @@ Fork of [HyldraZolxy/BeatSaber-Overlay](https://github.com/HyldraZolxy/BeatSaber
 
 This fork replaces the PHP backend with a static site hosted on **S3 + CloudFront**. The ScoreSaber API proxy is handled by CloudFront Functions (path rewriting + CORS). Infrastructure is managed with Terraform and deployed via GitHub Actions.
 
+## Migrating from the Original Overlay
+
+If you're already using `overlay.hyldrazolxy.fr` in OBS, just replace the domain in your Browser Source URL:
+
+`overlay.hyldrazolxy.fr` -> `hyldrazolxy-overlay.bakas.io`
+
+All your query parameters (skin, ScoreSaber ID, position, etc.) stay the same.
+
 ## Local Development
 
 ```bash
