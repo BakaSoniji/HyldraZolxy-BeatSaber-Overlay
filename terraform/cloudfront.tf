@@ -198,3 +198,15 @@ resource "aws_route53_record" "overlay" {
     evaluate_target_health = false
   }
 }
+
+resource "aws_route53_record" "overlay_ipv6" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = var.domain_name
+  type    = "AAAA"
+
+  alias {
+    name                   = aws_cloudfront_distribution.overlay.domain_name
+    zone_id                = aws_cloudfront_distribution.overlay.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
