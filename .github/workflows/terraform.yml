@@ -20,6 +20,7 @@ jobs:
   speculative-plan:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v6
