@@ -102,7 +102,15 @@ jobs:
             -var="domain_name=${{ vars.TF_VAR_DOMAIN_NAME }}" \
             -var="route53_zone_name=${{ vars.TF_VAR_ROUTE53_ZONE_NAME }}" \
             -var="s3_bucket_name=${{ vars.TF_VAR_S3_BUCKET_NAME }}" \
-            -out=tfplan
+            -out=tfplan \
+            2>&1 | tee plan.txt
+
+      - name: Post plan to job summary
+        run: |
+          echo '#### Terraform Plan' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat terraform/plan.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
